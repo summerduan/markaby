@@ -21,7 +21,7 @@ $:.unshift File.expand_path(File.dirname(__FILE__))
 module Markaby
   VERSION = '0.5'
 
-  class InvalidXhtmlError < Exception; end
+  class InvalidXhtmlError < StandardError; end
 end
 
 unless defined?(Builder)
