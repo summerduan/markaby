@@ -141,6 +141,8 @@ module Markaby
       if block
         str = capture(&block)
         block = proc { text(str) }
+      elsif !@tagset.self_closing.include?(tag.to_sym) && !args.find{|t|!t.kind_of?(Hash)}
+        block = lambda{}
       end
 
       f = fragment { @builder.method_missing(tag, *args, &block) }
