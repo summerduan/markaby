@@ -246,8 +246,8 @@ module Markaby
     private
 
     def xhtml_html(attrs = {}, &block)
-      instruct! if @output_xml_instruction
-      declare!(:DOCTYPE, :html, :PUBLIC, *tagset.doctype)
+      @builder.instruct! if @output_xml_instruction
+      @builder.declare!(:DOCTYPE, :html, :PUBLIC, *tagset.doctype)
       tag!(:html, @root_attributes.merge(attrs), &block)
     end
 
