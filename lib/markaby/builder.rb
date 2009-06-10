@@ -82,7 +82,7 @@ module Markaby
 
     # Returns a string containing the HTML stream.  Internally, the stream is stored as an Array.
     def to_s
-      @streams.last.to_s
+      @streams.last.join
     end
 
     # Write a +string+ to the HTML stream without escaping it.
