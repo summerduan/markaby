@@ -82,7 +82,7 @@ module Markaby
 
     # Returns a string containing the HTML stream.  Internally, the stream is stored as an Array.
     def to_s
-      @streams.last.to_s
+      @streams.last.join
     end
 
     # Write a +string+ to the HTML stream without escaping it.
@@ -105,7 +105,7 @@ module Markaby
       str = instance_eval(&block)
       str = @streams.last.join if @streams.last.any?
       @streams.pop
-      @builder.level -= 1
+      @builder.level -= 1 if @builder.level > 1
       @builder.target = @streams.last
       str
     end
@@ -141,6 +141,8 @@ module Markaby
       if block
         str = capture(&block)
         block = proc { text(str) }
+      elsif !@tagset.self_closing.include?(tag.to_sym) && !args.find{|t|!t.kind_of?(Hash)}
+        block = lambda{}
       end
 
       f = fragment { @builder.method_missing(tag, *args, &block) }
@@ -246,8 +248,9 @@ module Markaby
     private
 
     def xhtml_html(attrs = {}, &block)
-      instruct! if @output_xml_instruction
-      declare!(:DOCTYPE, :html, :PUBLIC, *tagset.doctype)
+      @builder.level = 0
+      @builder.instruct! if @output_xml_instruction
+      @builder.declare!(:DOCTYPE, :html, :PUBLIC, *tagset.doctype)
       tag!(:html, @root_attributes.merge(attrs), &block)
     end
 
