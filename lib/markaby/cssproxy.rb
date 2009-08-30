@@ -14,6 +14,12 @@ module Markaby
       @builder.tag! @sym
     end
     
+    def respond_to?(sym, include_private = false)
+      include_private || !private_methods.include?(sym.to_s) ? true : false
+    end
+
+  private
+
     # Adds attributes to an element.  Bang methods set the :id attribute.
     # Other methods add to the :class attribute.
     def method_missing(id_or_class, *args, &block)
@@ -41,7 +47,7 @@ module Markaby
         @builder.tag! @sym, *args
       end
       
-      return self
+      self
     end
 
   end

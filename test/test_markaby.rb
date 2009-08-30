@@ -1,31 +1,6 @@
-require 'test/unit'
-
-$:.unshift File.expand_path(File.join(File.dirname(__FILE__), '..', 'lib'))
-
-require 'markaby'
-require 'markaby/kernel_method'
-
-module MarkabyTestHelpers
-  def link_to(obj)
-    %{<a href="">#{obj}</a>}
-  end
-  def pluralize(string)
-    string + "s"
-  end
-  module_function :link_to, :pluralize
-end
+require File.expand_path(File.dirname(__FILE__) + "/test_helper")
 
 class MarkabyTest < Test::Unit::TestCase
-
-  def assert_exception(exclass, exmsg, *mab_args, &block)
-    begin
-      mab(*mab_args, &block)
-    rescue Exception => e
-      assert_equal exclass, e.class
-      assert_equal exmsg, e.message
-    end
-  end
-  
   def test_simple
     assert_equal "<hr/>", mab { hr }
     assert_equal "<hr/><br/>", mab { hr; br }
@@ -73,7 +48,7 @@ class MarkabyTest < Test::Unit::TestCase
     assert_equal %{<a href="">edit</a>}, mab({}, MarkabyTestHelpers) { link_to('edit') }
     assert mab({}, MarkabyTestHelpers) { @output_helpers = false; link_to('edit'); nil }.empty?
     Markaby::Builder.ignore_helpers :pluralize
-    assert_exception(NoMethodError, "no such method `pluralize'", {}, MarkabyTestHelpers) { pluralize('squirrel') }
+    assert_exception(NoMethodError, "undefined method `pluralize'", {}, MarkabyTestHelpers) { pluralize('squirrel') }
   end
 
   def test_builder_bang_methods
@@ -90,7 +65,7 @@ class MarkabyTest < Test::Unit::TestCase
   end
 
   def test_invalid_xhtml
-    assert_exception(NoMethodError, "no such method `dav'") { dav {} }
+    assert_exception(NoMethodError, "undefined method `dav'") { dav {} }
     assert_exception(Markaby::InvalidXhtmlError, "no attribute `styl' on div elements") { div(:styl => 'ok') {} }
     assert_exception(Markaby::InvalidXhtmlError, "no attribute `class' on tbody elements") { tbody.okay {} }
   end
@@ -122,5 +97,12 @@ class MarkabyTest < Test::Unit::TestCase
     assert doc.include?(%{<title>Salut!</title>})
     assert doc.include?(%{ lang="fr"})
   end
-
+  
+  def version_file
+    File.expand_path(File.dirname(__FILE__) + "/../VERSION")
+  end
+  
+  def test_markaby_should_have_correct_version
+    assert_equal Markaby::VERSION, File.read(version_file).strip
+  end
 end

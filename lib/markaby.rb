@@ -19,17 +19,13 @@ $:.unshift File.expand_path(File.dirname(__FILE__))
 # * Markaby::Template: a class for hooking Markaby into Rails as a
 #   proper templating language.
 module Markaby
-  VERSION = '0.5'
+  version_file = File.expand_path(File.dirname(__FILE__) + "/../VERSION")
+  VERSION      = File.read(version_file).strip
 
   class InvalidXhtmlError < StandardError; end
 end
 
-unless defined?(Builder)
-  require 'rubygems'
-  require 'builder'
-end
-
+require 'builder' unless defined?(Builder)
 require 'markaby/builder'
 require 'markaby/cssproxy'
-require 'markaby/metaid'
 require 'markaby/template'

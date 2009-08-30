@@ -1,4 +1,5 @@
 require 'markaby/tags'
+require 'markaby/builder_tags'
 
 module Markaby
   # The Markaby::Builder class is the central gear in the system.  When using
@@ -19,16 +20,19 @@ module Markaby
   #   puts mab.to_s
   #
   class Builder
+    include Markaby::BuilderTags
 
     @@default = {
-      :indent => 0,
-      :output_helpers => true,
+      :indent                 => 0,
+      :output_helpers         => true,
       :output_xml_instruction => true,
-      :output_meta_tag => true,
-      :auto_validation => true,
-      :tagset => Markaby::XHTMLTransitional,
+      :output_meta_tag        => true,
+      :auto_validation        => true,
+      :tagset                 => Markaby::XHTMLTransitional,
       :root_attributes => {
-        :xmlns => 'http://www.w3.org/1999/xhtml', :'xml:lang' => 'en', :lang => 'en'
+        :xmlns      => 'http://www.w3.org/1999/xhtml',
+        :'xml:lang' => 'en',
+        :lang       => 'en'
       }
     }
 
@@ -115,29 +119,30 @@ module Markaby
     def tag!(tag, *args, &block)
       ele_id = nil
       if @auto_validation and @tagset
-          if !@tagset.tagset.has_key?(tag)
-              raise InvalidXhtmlError, "no element `#{tag}' for #{tagset.doctype}"
-          elsif args.last.respond_to?(:to_hash)
-              attrs = args.last.to_hash
-              
-              if @tagset.forms.include?(tag) and attrs[:id]
-                attrs[:name] ||= attrs[:id]
-              end
-              
-              attrs.each do |k, v|
-                  atname = k.to_s.downcase.intern
-                  unless k =~ /:/ or @tagset.tagset[tag].include? atname
-                      raise InvalidXhtmlError, "no attribute `#{k}' on #{tag} elements"
-                  end
-                  if atname == :id
-                      ele_id = v.to_s
-                      if @elements.has_key? ele_id
-                          raise InvalidXhtmlError, "id `#{ele_id}' already used (id's must be unique)."
-                      end
-                  end
-              end
+        if !@tagset.tagset.has_key?(tag)
+          raise InvalidXhtmlError, "no element `#{tag}' for #{tagset.doctype}"
+        elsif args.last.respond_to?(:to_hash)
+          attrs = args.last.to_hash
+
+          if @tagset.forms.include?(tag) and attrs[:id]
+            attrs[:name] ||= attrs[:id]
           end
+              
+          attrs.each do |k, v|
+            atname = k.to_s.downcase.intern
+            unless k =~ /:/ or @tagset.tagset[tag].include? atname
+              raise InvalidXhtmlError, "no attribute `#{k}' on #{tag} elements"
+            end
+            if atname == :id
+              ele_id = v.to_s
+              if @elements.has_key? ele_id
+                raise InvalidXhtmlError, "id `#{ele_id}' already used (id's must be unique)."
+              end
+            end
+          end
+        end
       end
+      
       if block
         str = capture(&block)
         block = proc { text(str) }
@@ -149,6 +154,24 @@ module Markaby
       @elements[ele_id] = f if ele_id
       f
     end
+
+    # Every HTML tag method goes through an html_tag call.  So, calling <tt>div</tt> is equivalent
+    # to calling <tt>html_tag(:div)</tt>.  All HTML tags in Markaby's list are given generated wrappers
+    # for this method.
+    #
+    # If the @auto_validation setting is on, this method will check for many common mistakes which
+    # could lead to invalid XHTML.
+    def html_tag(sym, *args, &block)
+      if @auto_validation and @tagset.self_closing.include?(sym) and block
+        raise InvalidXhtmlError, "the `#{sym}' element is self-closing, please remove the block"
+      elsif args.empty? and block.nil?
+        CssProxy.new(self, @streams.last, sym)
+      else
+        tag!(sym, *args, &block)
+      end
+    end
+
+  private
 
     # This method is used to intercept calls to helper methods and instance
     # variables.  Here is the order of interception:
@@ -181,71 +204,14 @@ module Markaby
         instance_variable_get(ivar)
       elsif !@helpers.nil? && @helpers.instance_variables.include?(ivar)
         @helpers.instance_variable_get(ivar)
-      elsif ::Builder::XmlMarkup.instance_methods.include?(sym.to_s) 
+      elsif ::Builder::XmlMarkup.instance_methods.include?(sym.to_s)
         @builder.__send__(sym, *args, &block)
       elsif @tagset.nil?
         tag!(sym, *args, &block)
       else
-        raise NoMethodError, "no such method `#{sym}'"
+        super
       end
     end
-
-    # Every HTML tag method goes through an html_tag call.  So, calling <tt>div</tt> is equivalent
-    # to calling <tt>html_tag(:div)</tt>.  All HTML tags in Markaby's list are given generated wrappers
-    # for this method.
-    #
-    # If the @auto_validation setting is on, this method will check for many common mistakes which
-    # could lead to invalid XHTML.
-    def html_tag(sym, *args, &block)
-      if @auto_validation and @tagset.self_closing.include?(sym) and block
-        raise InvalidXhtmlError, "the `#{sym}' element is self-closing, please remove the block"
-      elsif args.empty? and block.nil?
-        CssProxy.new(self, @streams.last, sym)
-      else
-        tag!(sym, *args, &block)
-      end
-    end
-
-    XHTMLTransitional.tags.each do |k|
-      class_eval %{
-        def #{k}(*args, &block)
-          html_tag(#{k.inspect}, *args, &block)
-        end
-      }
-    end
-
-    remove_method :head
-    
-    # Builds a head tag.  Adds a <tt>meta</tt> tag inside with Content-Type
-    # set to <tt>text/html; charset=utf-8</tt>.
-    def head(*args, &block)
-      tag!(:head, *args) do
-        tag!(:meta, "http-equiv" => "Content-Type", "content" => "text/html; charset=utf-8") if @output_meta_tag
-        instance_eval(&block)
-      end
-    end
-
-    # Builds an html tag.  An XML 1.0 instruction and an XHTML 1.0 Transitional doctype
-    # are prepended.  Also assumes <tt>:xmlns => "http://www.w3.org/1999/xhtml",
-    # :lang => "en"</tt>.
-    def xhtml_transitional(attrs = {}, &block)
-      self.tagset = Markaby::XHTMLTransitional
-      xhtml_html(attrs, &block)
-    end
-
-    # Builds an html tag with XHTML 1.0 Strict doctype instead.
-    def xhtml_strict(attrs = {}, &block)
-      self.tagset = Markaby::XHTMLStrict
-      xhtml_html(attrs, &block)
-    end
-
-    # Builds an html tag with XHTML 1.0 Frameset doctype instead.
-    def xhtml_frameset(attrs = {}, &block)
-      self.tagset = Markaby::XHTMLFrameset
-      xhtml_html(attrs, &block)
-    end
-
-    private
 
     def xhtml_html(attrs = {}, &block)
       @builder.level = 0
@@ -261,7 +227,6 @@ module Markaby
       length = stream.length - start
       Fragment.new(stream, start, length)
     end
-
   end
 
   # Every tag method in Markaby returns a Fragment.  If any method gets called on the Fragment,
@@ -288,5 +253,4 @@ module Markaby
   class XmlMarkup < ::Builder::XmlMarkup
     attr_accessor :target, :level
   end
-  
 end
